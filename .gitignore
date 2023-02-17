@@ -1,4 +1,6 @@
 /.streamlit
 /.venv
 /.vscode
+/models
+/__pycache__
 /petroglyphs-nlp.json
