@@ -1,48 +1,40 @@
+from utils import load_images_from_bucket, label2desc
+
 from google.oauth2 import service_account
 from google.cloud import storage
 
-from io import BytesIO
-from PIL import Image
-
+import tensorflow as tf
 import streamlit as st
 import pandas as pd
+import numpy as np
+
 import os
 
-# Create API client.
+#################################################################################
+# GCP Credentials
 credentials = service_account.Credentials.from_service_account_info(
     st.secrets["gcp_service_account"]
 )
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./petroglyphs-nlp.json"
 
-# GCS paths
+# GCS Paths
 bucket_figures_name = "daks_figures"
 bucket_pages_name = "daks_reports_pages"
 file_path = "figs_captions.csv"
 
+#################################################################################
+# Loading methods (usually cached)
 
-# data access utils
-def load_images_from_bucket(image_path, page_path, storage_client):
-    """
-    Load image, page from GCS bucket
-    :param image_path: path of the image as gcs blob (gs://)
-    :param page_path: path of the page as gcs blob (gs://)
-    :param storage_client: GCS client
-    :return: Pillow Image objects as tuple (image, page)
-    """
+@st.cache(allow_output_mutation=True)
+def load_model():
+    model = tf.keras.models.load_model(
+        './models/EfficientNetB0_57k.h5py',
+        compile=True
+    )
+    return model
 
-    image_path_components = image_path.split('/')
-    bucket_image_name = image_path_components[2]
-    image_name = image_path_components[3] + '/' + image_path_components[4]
-
-    page_path_components = page_path.split('/')
-    bucket_page_name = page_path_components[2]
-    page_name = page_path_components[3] + '/' + page_path_components[4]
-
-    blob_image_bytes = storage_client.bucket(bucket_image_name).get_blob(image_name)
-    blob_page_bytes = storage_client.bucket(bucket_page_name).get_blob(page_name)
-
-    return Image.open(BytesIO(blob_image_bytes.download_as_bytes())), Image.open(BytesIO(blob_page_bytes.download_as_bytes()))
-
+#################################################################################
+# Streamlit App
 
 st.title("Captioned Figures Dataset Explorer")
 
@@ -58,6 +50,11 @@ st.markdown(
     """
 )
 
+st.warning("Please wait for the app to load the model used for classification. This may take a few seconds...")
+
+# loading classifier model
+model = load_model()
+
 st.subheader("Dataset Content")
 
 # load original dataset
@@ -65,9 +62,9 @@ df = pd.read_csv(f'gs://{bucket_figures_name}/{file_path}', sep='|', storage_opt
 df.set_index('index', inplace=True)
 df['alternative caption'] = 'None'
 df['category'] = 'None'
-df['status'] = 'No Reviewed'
+df['status'] = 'To be reviewed'
 
-# Print dataset summary
+# dataset filters
 col_a, col_b, col_c = st.columns(3)
 
 with col_a:
@@ -80,12 +77,13 @@ with col_c:
 if show_only_non_validated:
     df = df[~df["status"]=="Validated"]
 
+# display dataset as a table
 st.dataframe(df[['caption', 'alternative caption', 'category', 'status']])
 
-
+# captioned Figures Validator
 st.subheader("Captioned Figure Explorer and Validator")
 
-# slider
+# images navigation slider
 index = st.slider(label="Image index", min_value=0, max_value=len(df))
 
 # display individual caption image in its page context
@@ -108,6 +106,6 @@ with col2:
 
 with st.form(key="figure_validator"):
     st.text_input(label="Alternative caption")
-    st.selectbox(label="category", options=["log", "map", "production plot", "section", "seismic", "correlation"])
-    st.selectbox(label="status", options=["Yes", "No"])
-    st.form_submit_button(label="Validate figure")
+    st.selectbox(label="category", options=sorted(label2desc.values()))
+    st.selectbox(label="Status", options=["Validated", "Not Validated", "To be reviewed"])
+    st.form_submit_button(label="Save changes")
