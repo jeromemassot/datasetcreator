@@ -1,4 +1,4 @@
-from utils import load_images_from_bucket, label2desc
+from utils import load_images_from_bucket, predict_category, label2desc, index2label, image_size
 
 from google.oauth2 import service_account
 from google.cloud import storage
@@ -97,12 +97,18 @@ image, page = load_images_from_bucket(image_blob_path, page_blob_path, storage_c
 # two columns to display the figure and page image side-by-side
 col1, col2 = st.columns(2)
 with col1:
+    st.write("Original page")
+    st.image(page)
+
+with col2:
     st.write("Captioned Image")
     st.image(image, caption=df.at[index, 'caption'])
 
-with col2:
-    st.write("Original page")
-    st.image(page)
+    # predict the category of the figure
+    category = predict_category(
+       image, model, image_size['B0']['IMG_SIZE'], index2label, label2desc
+    )
+    st.write(f'Model predicted category: {category}')
 
 with st.form(key="figure_validator"):
     st.text_input(label="Alternative caption")
