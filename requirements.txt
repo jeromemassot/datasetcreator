@@ -3,3 +3,4 @@ streamlit
 pandas
 google-cloud-storage==2.6.0
 gcsfs==0.6.2
+tensorflow<2.11
