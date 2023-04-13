@@ -195,3 +195,25 @@ def predict_category(
         return label
     else:
         return pred
+    
+
+def crop_image(image:Image, coords:list, w:int, h:int, expansion:float=1.) -> Image:
+    """
+    Crop image
+    :param image: Pillow Image object
+    :param coords: coordinates of the crop
+    :param w: image width
+    :param h: image height
+    :param expansion: expansion factor
+    :return: cropped image as Pillow Image object
+    """
+
+    coords[0] = coords[0]*expansion
+    coords[1] = coords[1]*expansion
+    coords[2] = coords[2]/expansion
+    coords[3] = coords[3]/expansion
+
+    image_crop = image.crop(
+        (int(coords[2]*w), int((1-coords[1])*h), int(coords[0]*w), int((1-coords[3])*h))
+    )
+    return image_crop
