@@ -21,16 +21,67 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./petroglyphs-nlp.json"
 # Loading methods (usually cached)
 
 @st.cache(allow_output_mutation=True)
-def load_model():
+def load_model(model_name:str='EfficientNetB0_57k'):
+    """
+    Load the classifier model from the models folder
+    :param model_name: name of the model to load
+    :return: the loaded model, image size
+    """
     model = tf.keras.models.load_model(
-        './models/EfficientNetB7_57k.h5py',
+        f'./models/{model_name}.h5py',
         compile=True
     )
-    return model
+
+    if model_name == "EfficientNetB0_57k":
+        selected_image_size = image_size['B0']['IMG_SIZE']
+    else:
+        selected_image_size = image_size['B7']['IMG_SIZE']
+
+    return model, selected_image_size
+
+
+@st.cache(allow_output_mutation=True)
+def load_dataset(bucket_figures_name:str) -> pd.DataFrame:
+    """
+    Load the list of figures and associated metadata as Pandas DataFrame
+    :param bucket_figures_name: name of the GCS bucket
+    :return: figures data as Pandas Dataframe and the GCS client
+    """
+    # init the GCS client
+    storage_client = storage.Client()
+
+    file_path = "figs_captions.csv"
+    df = pd.read_csv(f'gs://{bucket_figures_name}/{file_path}', sep='|', storage_options={"token": "petroglyphs-nlp.json"})
+    df.set_index('index', inplace=True)
+    df.reset_index(inplace=True)
+
+    return df, storage_client
 
 
 #################################################################################
 # Streamlit App
+
+## Sidebar
+
+# bucket selector
+st.sidebar.subheader("Dataset Selector")
+
+bucket_name = st.sidebar.selectbox(
+    label="Select a dataset bucket",
+    options=["exploration_development", "petrophysics", "structural", "well_logs"]
+)
+bucket_figures_name = f"{bucket_name}_figures"
+bucket_pages_name = f"{bucket_name}_pages"
+
+# model selector
+st.sidebar.subheader("Model Selector")
+
+model_name = st.sidebar.selectbox(
+    label="Select a model",
+    options=["EfficientNetB0_57k", "EfficientNetB7_57k"]
+)
+
+## Main page
 
 st.title("Captioned Figures Dataset Explorer")
 
@@ -47,37 +98,20 @@ st.markdown(
 st.warning("Please wait for the app to load the model used for classification. This may take a few seconds...")
 
 # loading classifier model
-model = load_model()
-
-st.subheader("Dataset Content")
-
-st.markdown(
-    """The dataset is contained in Google Cloud Storage bucket and metadata is stored in a BigQuery table."""
-)
-
-# bucket selector
-st.sidebar.subheader("Dataset Selector")
-bucket_name = st.sidebar.selectbox(
-    label="Select a dataset bucket",
-    options=["exploration_development", "petrophysics", "structural", "well_logs"]
-)
-bucket_figures_name = f"{bucket_name}_figures"
-bucket_pages_name = f"{bucket_name}_pages"
-file_path = "figs_captions.csv"
+model, selected_image_size = load_model(model_name)
 
 # load original dataset
-df = pd.read_csv(f'gs://{bucket_figures_name}/{file_path}', sep='|', storage_options={"token": "petroglyphs-nlp.json"})
-df.set_index('index', inplace=True)
-df.reset_index(inplace=True)
+df, storage_client = load_dataset(bucket_figures_name)
 
 # captioned Figures Validator
-st.subheader("Captioned Figure Explorer and Validator")
+st.subheader("Captioned Figures Explorer")
 
 st.markdown("""
     For each figure in the dataset, you can display the figure and its original context (page).
     You can zoom out to see the context of the figure by using the zoom-out selector.
 """)
 
+## figure navigation slider
 col1, col2 = st.columns([8, 2])
 with col1:
     # images navigation slider
@@ -86,7 +120,6 @@ with col2:
     expansion = st.number_input(label="Zoom-out", value=1.1, min_value=1.0, max_value=1.5, step=0.1)
 
 # display individual caption image in its page context
-storage_client = storage.Client()
 
 # extract the figure and page images from blobs
 image_blob_path = df.at[index, 'path']
@@ -100,26 +133,43 @@ coords = [float(coord) for coord in coords]
 page_cropped = crop_image(page, coords, page.width, page.height, expansion)
 
 # two columns to display the figure and page area side-by-side
-col3, col4 = st.columns(2)
-with col3:
-    st.write("Page context")
-    st.image(page_cropped)
+with st.expander(label="Figure and Page Context"):
+    col3, col4, col5 = st.columns([9, 1, 9])
+    with col3:
+        st.image(page_cropped)
+        st.write("Page context")
+    with col5:
+        st.image(image)
+        st.write("Captioned Image")
 
-with col4:
-    st.write("Captioned Image")
-    st.image(image)
+st.markdown("""If needed, you can overwrite the image by cropping the page to better fit the figure.""")
+st.warning("""The updated figure will replace the original figure in the database. Do it only if needed.""")
 
-    # predict the category of the figure
-    category = predict_category(
-       image, model, image_size['B7']['IMG_SIZE'], index2label, label2desc
-    )
+# two columns to page the new figure side-by-side
+with st.expander(label="Figure Extraction"):
+    col6, col7, col8 = st.columns([9, 1, 9])
+    with col6:
+        st.image(page)
+        st.write("Page")
+
+    with col8:
+        #st.image(page_cropped)
+        st.write("Updated Image")
+
+
+# predict the category of the figure
+category = predict_category(
+    image, model, selected_image_size, index2label, label2desc
+)
 
 # find the index of the category in the list of categories
 categories = sorted(label2desc.values())
 category_index = list(categories).index(category)
 
+st.markdown("""You can now validate or modify the metadata attached to the figure. Click the Save button when done.""")
 with st.form(key="figure_validator"):
-    st.text_area(label="Caption", value=caption, height=100)
-    st.selectbox(label="Category", index=category_index, options=sorted(categories))
-    st.selectbox(label="Status", options=["Validated", "Not Validated", "To be reviewed"])
+    caption = st.text_area(label="Caption", value=caption, height=100)
+    tags = st.multiselect(label="Tags", options=['structural', 'stratigraphic', 'sedimentology', 'reservoir', 'fluids', 'production'])
+    category = st.selectbox(label="Category", index=category_index, options=sorted(categories))
+    status = st.selectbox(label="Status", options=["Validated", "Not Validated", "To be reviewed"])
     st.form_submit_button(label="Save changes")
