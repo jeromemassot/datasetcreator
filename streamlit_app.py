@@ -3,6 +3,7 @@ from utils import load_images_from_bucket, predict_category, label2desc, index2l
 from google.oauth2 import service_account
 from google.cloud import storage
 
+from streamlit_cropper import st_cropper
 import tensorflow as tf
 import streamlit as st
 import pandas as pd
@@ -142,20 +143,19 @@ with st.expander(label="Figure and Page Context"):
         st.image(image)
         st.write("Captioned Image")
 
-st.markdown("""If needed, you can overwrite the image by cropping the page to better fit the figure.""")
+st.markdown("""
+If needed, you can overwrite the image by cropping the page to better fit the figure.
+Just drag the corners of the box to select the area of interest. The updated figure will be displayed below.
+""")
 st.warning("""The updated figure will replace the original figure in the database. Do it only if needed.""")
 
 # two columns to page the new figure side-by-side
 with st.expander(label="Figure Extraction"):
-    col6, col7, col8 = st.columns([9, 1, 9])
-    with col6:
-        st.image(page)
-        st.write("Page")
-
-    with col8:
-        #st.image(page_cropped)
-        st.write("Updated Image")
-
+   
+    cropped_img = st_cropper(page, box_color='black', realtime_update=False)
+    if cropped_img:
+        st.image(cropped_img)
+        st.write("Updated Figure")
 
 # predict the category of the figure
 category = predict_category(
