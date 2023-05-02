@@ -21,7 +21,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./petroglyphs-nlp.json"
 #################################################################################
 # Loading methods (usually cached)
 
-@st.cache(allow_output_mutation=True)
+@st.cache_resource()
 def load_model(model_name:str='EfficientNetB0_57k'):
     """
     Load the classifier model from the models folder
@@ -41,20 +41,36 @@ def load_model(model_name:str='EfficientNetB0_57k'):
     return model, selected_image_size
 
 
-@st.cache(allow_output_mutation=True)
-def load_dataset(bucket_figures_name:str) -> pd.DataFrame:
+@st.cache_resource()
+def load_dataset_from_bq(origin:str, status:str='Not Validated') -> pd.DataFrame:
     """
-    Load the list of figures and associated metadata as Pandas DataFrame
-    :param bucket_figures_name: name of the GCS bucket
+    Load the list of figures and associated metadata as Pandas DataFrame from BigQuery
+    :param origin: origin of the figures (also the name of the GCS bucket)
+    :param status: status of the figures to load
     :return: figures data as Pandas Dataframe and the GCS client
     """
     # init the GCS client
     storage_client = storage.Client()
 
-    file_path = "figs_captions.csv"
-    df = pd.read_csv(f'gs://{bucket_figures_name}/{file_path}', sep='|', storage_options={"token": "petroglyphs-nlp.json"})
-    df.set_index('index', inplace=True)
-    df.reset_index(inplace=True)
+    # load the dataset from BigQuery
+    query = f"""
+        SELECT
+            id,
+            url,
+            category,
+            coords,
+            caption,
+            tags,
+            origin,
+            document,
+            page_index,
+            status
+        FROM
+            `petroglyphs-nlp.geosciences_ai_datasets.geosciences-captioned-figures`
+        WHERE
+            status = '{status}' AND origin = '{origin}'
+    """
+    df = pd.read_gbq(query=query, dialect='standard')
 
     return df, storage_client
 
@@ -102,7 +118,7 @@ st.warning("Please wait for the app to load the model used for classification. T
 model, selected_image_size = load_model(model_name)
 
 # load original dataset
-df, storage_client = load_dataset(bucket_figures_name)
+df, storage_client = load_dataset_from_bq(bucket_figures_name)
 
 # captioned Figures Validator
 st.subheader("Captioned Figures Explorer")
@@ -123,10 +139,11 @@ with col2:
 # display individual caption image in its page context
 
 # extract the figure and page images from blobs
-image_blob_path = df.at[index, 'path']
+image_blob_path = df.at[index, 'url']
 page_blob_path = f"gs://{bucket_pages_name}/{str(df.at[index, 'document']).zfill(3)}/{df.at[index, 'page_index']}.jpg"
 image, page = load_images_from_bucket(image_blob_path, page_blob_path, storage_client)
-caption=df.at[index, 'raw_text']
+caption = df.at[index, 'caption']
+status = df.at[index, 'status']
 
 # crop the page image to focus on the figure area
 coords = df.at[index, 'coords'].split('|')
@@ -171,5 +188,5 @@ with st.form(key="figure_validator"):
     caption = st.text_area(label="Caption", value=caption, height=100)
     tags = st.multiselect(label="Tags", options=['structural', 'stratigraphic', 'sedimentology', 'reservoir', 'fluids', 'production'])
     category = st.selectbox(label="Category", index=category_index, options=sorted(categories))
-    status = st.selectbox(label="Status", options=["Validated", "Not Validated", "To be reviewed"])
+    status = st.selectbox(label="Status", options=["Validated", "Not Validated", "To be reviewed"], index=["Validated", "Not Validated", "To be reviewed"].index(status))
     st.form_submit_button(label="Save changes")
