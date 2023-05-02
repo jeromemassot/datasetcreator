@@ -226,6 +226,11 @@ def crop_image(image:Image, coords:list, w:int, h:int, expansion:float=1.) -> Im
 
 
 def clean_caption(text:str) -> str:
+    """
+    Clean caption text using regex
+    :param text: caption text
+    :return: cleaned caption text
+    """
     rule1 = r'[Ff]ig(?:ure)?\s*(?:[,-:.])?\s*\d*(?:[,-:.])?\s*'
     rule2 = r'[Tt]ab(?:le)?\s*(?:[,-:.])?\s*\d*(?:[,-:.])?\s*'
     text = re.sub(rule1, '', text)
@@ -250,7 +255,7 @@ def init_bq_table_from_csv(bucket_name:str)-> None:
         modified_str = ''
         for i, line in enumerate(f.readlines()):
             if i==0:
-                modified_str += 'id|url|category|caption|tags|origin|page_index|status|backup\n'
+                modified_str += 'id|url|category|coords|caption|tags|origin|document|page_index|status|backup\n'
             else:
                 components = line.split('|')
                 figure_id = str(uuid.uuid5(uuid.NAMESPACE_X500 , components[9]))
@@ -265,11 +270,14 @@ def init_bq_table_from_csv(bucket_name:str)-> None:
                 figure_backup = 'None'
 
                 origin = bucket_name
+                document = components[1]
                 page_index = components[10]
 
+                coords = '|'.join(components[4:8])
+
                 bq_schema_data = [
-                    figure_id, figure_url, figure_category, figure_caption, 
-                    figure_tags, origin, page_index, figure_status, figure_backup
+                    figure_id, figure_url, figure_category, coords, figure_caption, 
+                    figure_tags, origin, document, page_index, figure_status, figure_backup
                 ]
 
                 new_line = "|".join(bq_schema_data)
@@ -289,9 +297,11 @@ def init_bq_table_from_csv(bucket_name:str)-> None:
             bigquery.SchemaField("id", "STRING", "REQUIRED"),
             bigquery.SchemaField("url", "STRING", "REQUIRED"),
             bigquery.SchemaField("category", "STRING", "NULLABLE"),
+            bigquery.SchemaField("coords", "STRING", "NULLABLE"),
             bigquery.SchemaField("caption", "STRING", "NULLABLE"),
             bigquery.SchemaField("tags", "STRING", "NULLABLE"),
             bigquery.SchemaField("origin", "STRING", "REQUIRED"),
+            bigquery.SchemaField("document", "STRING", "REQUIRED"),
             bigquery.SchemaField("page_index", "STRING", "REQUIRED"),
             bigquery.SchemaField("status", "STRING", "NULLABLE"), 
             bigquery.SchemaField("backup_url", "STRING", "NULLABLE")
