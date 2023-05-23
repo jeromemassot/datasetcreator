@@ -85,7 +85,7 @@ st.sidebar.subheader("Dataset Selector")
 
 bucket_name = st.sidebar.selectbox(
     label="Select a dataset bucket",
-    options=["exploration_development", "petrophysics", "structural", "well_logs"]
+    options=["daks", "exploration_development", "petrophysics", "structural", "well_logs"]
 )
 bucket_figures_name = f"{bucket_name}_figures"
 bucket_pages_name = f"{bucket_name}_pages"
