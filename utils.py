@@ -10,6 +10,8 @@ from io import BytesIO
 from PIL import Image
 import numpy as np
 
+import os
+
 #################################################################################
 # Classifier parameters (labels, indexes, description, image size)
 
@@ -325,3 +327,78 @@ def init_bq_table_from_csv(bucket_name:str)-> None:
     # make an API request
     destination_table = bq_client.get_table(table_id)
     print("Loaded {} rows.".format(destination_table.num_rows))
+
+
+def overwrite_figure(new_image:Image, current_image:Image, url:str, storage_client) -> str:
+    """
+    Overwrite the figure by cropping the page image
+    :param new_image: cropped image
+    :param current_image: current image
+    :param url: url of the figure
+    :param storage_client: storage client
+    :return: None
+    """
+    
+    # get the bucket name
+    bucket_name = url.split('/')[2]
+
+    # get the folder name
+    folder_name = url.split('/')[-2]
+
+    # get the blob name
+    blob_name = url.split('/')[-1]
+    blob_name = f'{folder_name}/{blob_name}'
+
+    # convert the new_image to bytes
+    new_img_byte_arr = BytesIO()
+    new_image.save(new_img_byte_arr, format='JPEG')
+
+    # convert the new_image to bytes
+    current_img_byte_arr = BytesIO()
+    current_image.save(current_img_byte_arr, format='JPEG')
+
+    # upload the new image to the bucket
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+    blob.upload_from_string(new_img_byte_arr.getvalue(), content_type='image/jpeg')
+
+    # upload the current image to the bucket as backup
+    backup_blob = bucket.blob('backup_' + blob_name)
+    backup_blob.upload_from_string(current_img_byte_arr.getvalue(), content_type='image/jpeg')
+
+    # backup the url
+    backup_url = url.replace(blob_name, 'backup_' + blob_name)
+
+    return backup_url
+
+
+def update_bigquery_table(filters:dict, field:str, value:str) -> str:
+    """
+    Update the BigQuery table
+    :param filters: dictionary {filter: value}
+    :param field: field to update
+    :param value: value to update
+    :return: confirmation message
+    """
+
+     # construct a BigQuery client object.
+    bq_client = bigquery.Client()
+
+    # update the field in the BigQuery table
+    query = f"""
+        UPDATE `petroglyphs-nlp.geosciences_ai_datasets.geosciences-captioned-figures`
+        SET {field} = "{value}" 
+        WHERE
+    """
+
+    for filter, value in filters.items():
+        query += f"{filter} =" + f'"{value}" AND '
+
+    # remove the last AND
+    query = query[:-5]
+
+    # make an API request
+    query_job = bq_client.query(query)
+    query_job.result()
+
+    return f"{query_job.num_dml_affected_rows} image(s) has been updated..."
