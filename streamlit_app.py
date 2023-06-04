@@ -1,4 +1,8 @@
-from utils import load_images_from_bucket, predict_category, label2desc, index2label, image_size, crop_image
+from utils import (
+    load_images_from_bucket, predict_category, label2desc, 
+    index2label, image_size, crop_image, overwrite_figure,
+    update_bigquery_table
+)
 
 from google.oauth2 import service_account
 from google.cloud import storage
@@ -64,7 +68,8 @@ def load_dataset_from_bq(origin:str, status:str='Not Validated') -> pd.DataFrame
             origin,
             document,
             page_index,
-            status
+            status, 
+            backup_url
         FROM
             `petroglyphs-nlp.geosciences_ai_datasets.geosciences-captioned-figures`
         WHERE
@@ -73,7 +78,6 @@ def load_dataset_from_bq(origin:str, status:str='Not Validated') -> pd.DataFrame
     df = pd.read_gbq(query=query, dialect='standard')
 
     return df, storage_client
-
 
 #################################################################################
 # Streamlit App
@@ -132,21 +136,27 @@ st.markdown("""
 col1, col2 = st.columns([8, 2])
 with col1:
     # images navigation slider
-    index = st.slider(label="Image index", min_value=0, max_value=len(df))
+    index = st.slider(label="Image index", min_value=0, max_value=len(df)-1)
 with col2:
     expansion = st.number_input(label="Zoom-out", value=1.1, min_value=1.0, max_value=1.5, step=0.1)
 
 # display individual caption image in its page context
 
+# extract the figure and page images information
+id_image = df.at[index, 'id']
+page_index = df.at[index, 'page_index']
+document = df.at[index, 'document']
+caption = df.at[index, 'caption']
+status = df.at[index, 'status']
+
 # extract the figure and page images from blobs
 image_blob_path = df.at[index, 'url']
 page_blob_path = f"gs://{bucket_pages_name}/{str(df.at[index, 'document']).zfill(3)}/{df.at[index, 'page_index']}.jpg"
 image, page = load_images_from_bucket(image_blob_path, page_blob_path, storage_client)
-caption = df.at[index, 'caption']
-status = df.at[index, 'status']
 
 # crop the page image to focus on the figure area
-coords = df.at[index, 'coords'].split('|')
+raw_coords = df.at[index, 'coords']
+coords = raw_coords.split('|')
 coords = [float(coord) for coord in coords]
 page_cropped = crop_image(page, coords, page.width, page.height, expansion)
 
@@ -172,6 +182,12 @@ with st.expander(label="Figure Extraction"):
     cropped_img = st_cropper(page, box_color='black', realtime_update=False)
     if cropped_img:
         st.image(cropped_img)
+        overwrite_button = st.button(label="Overwrite Figure")
+        if overwrite_button:
+            filters = {'id': id_image, 'page_index': page_index, 'document': document, 'coords': raw_coords}
+            backup_url = overwrite_figure(cropped_img, image, image_blob_path, storage_client)
+            msg = update_bigquery_table(filters, 'backup_url', backup_url)
+            st.write(msg)
         st.write("Updated Figure")
 
 # predict the category of the figure
