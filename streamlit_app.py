@@ -89,7 +89,7 @@ st.sidebar.subheader("Dataset Selector")
 
 bucket_name = st.sidebar.selectbox(
     label="Select a dataset bucket",
-    options=["daks", "exploration_development", "petrophysics", "structural", "well_logs"]
+    options=["daks", "exploration_development", "petroleum_geology", "petrophysics", "structural", "well_logs"]
 )
 bucket_figures_name = f"{bucket_name}_figures"
 bucket_pages_name = f"{bucket_name}_pages"
@@ -202,7 +202,7 @@ category_index = list(categories).index(category)
 st.markdown("""You can now validate or modify the metadata attached to the figure. Click the Save button when done.""")
 with st.form(key="figure_validator"):
     caption = st.text_area(label="Caption", value=caption, height=100)
-    tags = st.multiselect(label="Tags", options=['structural', 'stratigraphic', 'sedimentology', 'reservoir', 'fluids', 'production'])
+    tags = st.multiselect(label="Tags", options=['structural', 'stratigraphy', 'sedimentology', 'reservoir', 'fluids', 'production'])
     category = st.selectbox(label="Category", index=category_index, options=sorted(categories))
     status = st.selectbox(label="Status", options=["Validated", "Not Validated", "To be reviewed"], index=["Validated", "Not Validated", "To be reviewed"].index(status))
     st.form_submit_button(label="Save changes")
