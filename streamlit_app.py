@@ -11,7 +11,6 @@ from streamlit_cropper import st_cropper
 import tensorflow as tf
 import streamlit as st
 import pandas as pd
-import numpy as np
 
 import os
 
@@ -90,7 +89,7 @@ st.sidebar.subheader("Dataset Selector")
 bucket_name = st.sidebar.selectbox(
     label="Select a dataset bucket",
     options=[
-        "daks", "exploration_development", "petroleum_geology", 
+        "daks", "exploration_development", "petroleum_geology", "petrology",
         "petrophysics", "sedimentology", "sequential_stratigraphy", 
         "structural", "well_logs"
     ]
@@ -178,6 +177,7 @@ st.markdown("""
 If needed, you can overwrite the image by cropping the page to better fit the figure.
 Just drag the corners of the box to select the area of interest. The updated figure will be displayed below.
 """)
+
 st.warning("""The updated figure will replace the original figure in the database. Do it only if needed.""")
 
 # two columns to page the new figure side-by-side
