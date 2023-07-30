@@ -172,7 +172,7 @@ if filter_dataset:
 
 ## figure navigation slider
 
-if st.session_state['current_df'] is not None:
+if 'current_df' in st.session_state.keys() and st.session_state['current_df'] is not None:
 
     df = st.session_state['current_df']
     storage_client = st.session_state['storage_client']
