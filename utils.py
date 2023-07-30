@@ -221,9 +221,14 @@ def crop_image(image:Image, coords:list, w:int, h:int, expansion:float=1.) -> Im
     coords[2] = coords[2]/expansion
     coords[3] = coords[3]/expansion
 
-    image_crop = image.crop(
-        (int(coords[2]*w), int((1-coords[1])*h), int(coords[0]*w), int((1-coords[3])*h))
-    )
+    cropped_coords = [
+        int(coords[2]*w), 
+        int(coords[3]*h), 
+        int(coords[0]*w), 
+        int(coords[1]*h)
+    ]
+
+    image_crop = image.crop(cropped_coords)
     return image_crop
 
 
