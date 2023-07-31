@@ -1,3 +1,8 @@
+#################################################################################
+## Copyright 2023 Petroglyphs NLP Consulting
+## Author: Jerome MASSOT - jerome.massot.78@gmail.com
+#################################################################################
+
 from tensorflow.keras.preprocessing import image
 import tensorflow as tf
 
@@ -8,6 +13,7 @@ import re
 
 from io import BytesIO
 from PIL import Image
+import pandas as pd
 import numpy as np
 
 import os
@@ -137,6 +143,12 @@ label2desc = {
 }
 index2label = {k: v for k, v in enumerate(label2desc.keys())}
 
+# Tags
+tags_list = [
+    'structural', 'stratigraphy', 'sedimentology', 
+    'reservoir', 'fluids', 'production'
+]
+
 # Image size for prediction
 image_size = {
     'B0': {'IMG_SIZE': 224},
@@ -146,7 +158,7 @@ image_size = {
 #################################################################################
 # Functions
 
-def load_images_from_bucket(image_path, page_path, storage_client):
+def load_images_from_bucket(image_path, page_path, storage_client) -> tuple:
     """
     Load image, page from GCS bucket
     :param image_path: path of the image as gcs blob (gs://)
@@ -166,7 +178,10 @@ def load_images_from_bucket(image_path, page_path, storage_client):
     blob_image_bytes = storage_client.bucket(bucket_image_name).get_blob(image_name)
     blob_page_bytes = storage_client.bucket(bucket_page_name).get_blob(page_name)
 
-    return Image.open(BytesIO(blob_image_bytes.download_as_bytes())), Image.open(BytesIO(blob_page_bytes.download_as_bytes()))
+    return (
+        Image.open(BytesIO(blob_image_bytes.download_as_bytes())), 
+        Image.open(BytesIO(blob_page_bytes.download_as_bytes()))
+    )
 
 
 def predict_category(
@@ -407,3 +422,64 @@ def update_bigquery_table(filters:dict, field:str, value:str) -> str:
     query_job.result()
 
     return f"{query_job.num_dml_affected_rows} image(s) has been updated..."
+
+
+def load_dataset_from_bq(origin:str, status:str='Not Validated') -> pd.DataFrame:
+    """
+    Load the list of figures and associated metadata as Pandas DataFrame from BigQuery
+    :param origin: origin of the figures (also the name of the GCS bucket)
+    :param status: status of the figures to load
+    :return: figures data as Pandas Dataframe and the GCS client
+    """
+    # init the GCS client
+    storage_client = storage.Client()
+
+    # load the dataset from BigQuery
+    query = f"""
+        SELECT
+            id,
+            url,
+            category,
+            coords,
+            caption,
+            tags,
+            origin,
+            document,
+            page_index,
+            status, 
+            backup_url
+        FROM
+            `petroglyphs-nlp.geosciences_ai_datasets.geosciences-captioned-figures`
+        WHERE
+            status = '{status}' AND origin = '{origin}'
+    """
+    df = pd.read_gbq(query=query, dialect='standard')
+
+    return df, storage_client
+
+
+def load_dataset_from_dataframe(df:pd.DataFrame, index:int) -> dict:
+    """
+    Load the figure metadata from a Pandas DataFrame
+    :param df: Pandas DataFrame containing the figure metadata
+    :param index: index of the figure to load
+    :return: the figure metadata as a dictionary
+    """
+    return df.iloc[index].to_dict()
+
+
+def reformat_cropped_coordinates(cropped_box:dict, width, height) -> list:
+    """
+    Reformat the cropped coordinates created by the streamlit-cropper component
+    :param cropped_box: cropped coordinates
+    :param width: page width
+    :param height: page height
+    :return: reformatted coordinates
+    """
+    crop_top = round(float(cropped_box['top']) / height, 2)
+    crop_left = round(float(cropped_box['left']) / width, 2)
+    crop_width = round(float(cropped_box['width']) / width, 2)
+    crop_height = round(float(cropped_box['height']) / height, 2)
+    crop_right = round(crop_left + crop_width, 2)
+    crop_bottom = round(crop_top + crop_height, 2)
+    return [crop_right, crop_bottom, crop_left, crop_top]
