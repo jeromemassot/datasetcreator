@@ -3,6 +3,7 @@ from google.cloud import storage
 import uuid
 import re
 
+
 def clean_caption(text:str) -> str:
     rule1 = r'[Ff][Ii][Gg](?:[Uu][Rr][Ee])?\s*\d*(?:[,-:.])?\s*\d*(?:[,-:.])?\d*\s*(?:[,-:.])?\d*\s*'
     rule2 = r'[Tt][Aa][Bb](?:[Ll][Ee])?\s*\d*(?:[,-:.])?\s*\d*(?:[,-:.])?\d*\s*(?:[,-:.])?\d*\s*'
