@@ -66,7 +66,7 @@ bucket_name = st.sidebar.selectbox(
     label="Select a dataset bucket",
     options=[
         "daks", "exploration_development", "general", "geophysical", 
-        "ifp", "petroleum_geology", "petrology", "petrophysics", 
+        "ifp", "lithium", "petroleum_geology", "petrology", "petrophysics", 
         "sedimentology", "sequential_stratigraphy", "structural", 
         "well_logs"
     ]
