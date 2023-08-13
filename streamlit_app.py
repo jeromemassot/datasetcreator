@@ -280,7 +280,7 @@ if 'current_df' in st.session_state.keys() and st.session_state['current_df'] is
             updated_caption = st.text_area(label="Caption", value=caption, height=100)
 
             # display the tags multiselect with the current tags selected
-            updated_tags = st.multiselect(label="Tags", options=tags_list, default=tags)
+            updated_tags = st.multiselect(label="Tags", options=sorted(tags_list), default=tags)
             if not updated_tags or len(updated_tags)==0:
                 updated_tags = 'None' # to be consistent with the database
             else:
@@ -288,7 +288,7 @@ if 'current_df' in st.session_state.keys() and st.session_state['current_df'] is
 
             # display the category
             updated_category = st.selectbox(
-                label="Category", index=category_index, options=sorted(categories)
+                label="Category", index=category_index, options=sorted(categories) + ['Others']
             )
 
             # display the status
@@ -305,7 +305,7 @@ if 'current_df' in st.session_state.keys() and st.session_state['current_df'] is
 
                 # find the index of the figure in the bigquery table based on
                 # the image id, the page index, the document id and the box coordinates
-                if st.session_state['crop_state']:
+                if 'crop_state' in st.session_state.keys() and st.session_state['crop_state']:
                     filtering_coords = st.session_state['crop_state']
                 else:
                     filtering_coords = raw_coords
