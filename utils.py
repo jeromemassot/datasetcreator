@@ -139,7 +139,8 @@ label2desc = {
     'XPM': 'Cross-Plot Points & Curve',
     'XPP': 'Cross-Plot Points',
     'XPR': 'Polar Plot',
-    'XPV': 'Cross-Plot Curve'
+    'XPV': 'Cross-Plot Curve',
+    'Others': 'Others'
 }
 index2label = {k: v for k, v in enumerate(label2desc.keys())}
 
@@ -148,7 +149,7 @@ tags_list = [
     'chemistry', 'mineral', 'physics', 'thermo-dynamism', 'experiment', 'mining',
     'geophysics', 'geology', 'geomechanics', 'petrophysics', 'geochemistry',
     'structural', 'stratigraphy', 'sedimentology', 
-    'reservoir', 'fluids', 'production'
+    'reservoir', 'fluids', 'production', 'well', 'drilling', 'completion'
 ]
 
 # Image size for prediction
