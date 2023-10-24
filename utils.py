@@ -146,7 +146,7 @@ index2label = {k: v for k, v in enumerate(label2desc.keys())}
 
 # Tags
 tags_list = [
-    'chemistry', 'mineral', 'physics', 'thermo-dynamism', 'experiment', 'mining',
+    'basin analysis', 'chemistry', 'mineral', 'physics', 'thermo-dynamism', 'experiment', 'mining',
     'geophysics', 'geology', 'geomechanics', 'petrophysics', 'geochemistry',
     'structural', 'stratigraphy', 'sedimentology', 
     'reservoir', 'fluids', 'production', 'well', 'drilling', 'completion'
